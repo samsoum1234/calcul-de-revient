@@ -313,6 +313,50 @@ body {
 .toast.warning {
   border-left-color: var(--warning);
 }
+
+/* Styles pour les documents */
+.preview-link { 
+  cursor: pointer; 
+  color: var(--accent); 
+  text-decoration: none; 
+  font-size: 0.85rem; 
+  display: flex; 
+  align-items: center; 
+  justify-content: space-between; 
+  margin-top: 5px;
+}
+
+.modal-img-preview { 
+  max-width: 100%; 
+  border-radius: 8px; 
+}
+
+.remove-doc { 
+  cursor: pointer; 
+  color: var(--danger); 
+  margin-left: 6px; 
+}
+
+.doc-attached-indicator { 
+  color: green; 
+  margin-right: 4px; 
+  font-size: 0.9rem; 
+  display: none; 
+}
+
+#docCounter { 
+  font-weight: bold; 
+  margin-bottom: 8px; 
+}
+
+#docCounter .badge { 
+  font-size: 0.9rem; 
+}
+
+.doc-file {
+  font-size: 0.8rem;
+  padding: 5px;
+}
 </style>
 </head>
 <body>
@@ -503,6 +547,7 @@ body {
                   <button id="btnCalculate" class="btn btn-success btn-sm"><i class="fas fa-calculator"></i> Calculer</button>
                 </div>
               </div>
+              <div id="docCounter" class="ms-2">Documents attachés : <span class="badge bg-secondary">0</span></div>
               <div class="table-responsive">
                 <table class="table table-sm table-bordered calculation-table" id="calcTable">
                   <thead>
@@ -514,6 +559,7 @@ body {
                       <th>Prix TTC</th>
                       <th>Quantité</th>
                       <th>Total</th>
+                      <th>Document</th>
                       <th>Action</th>
                     </tr>
                   </thead>
@@ -531,12 +577,19 @@ body {
                       <td><input class="form-control price-ttc" readonly placeholder="0.00"></td>
                       <td><input type="number" class="form-control quantity" step="0.01" min="0" placeholder="0"></td>
                       <td><input class="form-control total" readonly placeholder="0.00"></td>
+                      <td>
+                        <input type="file" class="form-control form-control-sm doc-file" accept=".pdf,.jpg,.png,.jpeg">
+                        <div class="preview-link d-none">
+                          <span><i class="fas fa-check-circle doc-attached-indicator"></i><span class="file-name"></span></span>
+                          <i class="fas fa-times remove-doc" title="Supprimer le document"></i>
+                        </div>
+                      </td>
                       <td><button class="btn btn-sm btn-danger remove-row"><i class="fas fa-trash"></i></button></td>
                     </tr>
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colspan="6" class="text-end fw-bold">Total général :</td>
+                      <td colspan="7" class="text-end fw-bold">Total général :</td>
                       <td id="globalTotalCell" class="fw-bold">0.00</td>
                       <td></td>
                     </tr>
@@ -609,6 +662,22 @@ body {
         </div>
         <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button><button type="submit" class="btn btn-primary">Réinitialiser</button></div>
       </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal preview -->
+<div class="modal fade" id="docPreviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Aperçu du document</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center">
+        <img id="docPreviewImg" class="modal-img-preview d-none" />
+        <p id="docPreviewInfo" class="text-muted"></p>
+      </div>
     </div>
   </div>
 </div>
@@ -737,6 +806,7 @@ document.addEventListener('DOMContentLoaded', () => {
   refreshUsersTable();
   refreshHistoryUI();
   updateSummaryDisplay();
+  updateDocCounter();
 });
 
 // ---------------- AUTH ----------------
@@ -884,7 +954,7 @@ function bindAuth(){
     // Hide loading
     spinner.style.display = 'none';
     loginBtn.disabled = false;
-    
+      
     enterApp();
   });
   
@@ -1082,25 +1152,81 @@ function bindApp(){
   }
 }
 
+// ---------------- DOCUMENTS FUNCTIONALITY ----------------
+const modalEl = document.getElementById('docPreviewModal');
+const previewImg = document.getElementById('docPreviewImg');
+const previewInfo = document.getElementById('docPreviewInfo');
+const bsModal = new bootstrap.Modal(modalEl);
+const docCounterEl = document.querySelector('#docCounter .badge');
+
+function updateDocCounter(){
+  const count = Array.from(document.querySelectorAll('#calcTable tbody tr')).filter(r=>r.dataset.docName).length;
+  docCounterEl.textContent = count;
+  if(count > 0){
+    docCounterEl.classList.remove('bg-secondary');
+    docCounterEl.classList.add('bg-success');
+  } else {
+    docCounterEl.classList.remove('bg-success');
+    docCounterEl.classList.add('bg-secondary');
+  }
+}
+
 function attachRowEvents(row){
   const price = row.querySelector('.price-ht');
   const qty = row.querySelector('.quantity');
   const remove = row.querySelector('.remove-row');
-  
+  const fileInput = row.querySelector('.doc-file');
+  const previewDiv = row.querySelector('.preview-link');
+  const fileNameSpan = row.querySelector('.file-name');
+  const removeDocBtn = row.querySelector('.remove-doc');
+  const indicator = row.querySelector('.doc-attached-indicator');
+
   if(price) price.addEventListener('input', ()=>calcRow(row));
   if(qty) qty.addEventListener('input', ()=>calcRow(row));
-  if(remove) remove.addEventListener('click', (e)=>{ 
-    e.preventDefault(); 
-    
-    // Add fade out animation
-    row.style.opacity = '0';
-    row.style.transition = 'opacity 0.3s';
-    
-    setTimeout(() => {
-      row.remove(); 
-      calcGlobal();
-    }, 300);
+  if(remove) remove.addEventListener('click', (e)=>{e.preventDefault();row.remove();calcGlobal();updateDocCounter();});
+
+  if(fileInput) fileInput.addEventListener('change', ()=>{
+    const file = fileInput.files[0];
+    if(file){
+      row.dataset.docName = file.name;
+      const url = URL.createObjectURL(file);
+      row.dataset.docUrl = url;
+      fileNameSpan.textContent = file.name;
+      indicator.style.display = 'inline';
+      previewDiv.classList.remove('d-none');
+      previewDiv.onclick = (e)=>{
+        if(e.target.classList.contains('remove-doc')) return;
+        if(file.type.startsWith('image/')){
+          previewImg.src = url;
+          previewImg.classList.remove('d-none');
+          previewInfo.textContent = '';
+          bsModal.show();
+        } else {
+          previewImg.classList.add('d-none');
+          previewInfo.innerHTML = `<a href="${url}" download="${file.name}" class="btn btn-sm btn-primary mt-2">Télécharger</a>`;
+          bsModal.show();
+        }
+      }
+      updateDocCounter();
+      showToast(`Document "${file.name}" ajouté`, 'success');
+    } else {
+      clearDoc(row);
+    }
   });
+
+  if(removeDocBtn) removeDocBtn.addEventListener('click', ()=>{
+    clearDoc(row);
+    updateDocCounter();
+    showToast('Document supprimé', 'warning');
+  });
+}
+
+function clearDoc(row){
+  row.dataset.docName = '';
+  row.dataset.docUrl = '';
+  row.querySelector('.doc-file').value = '';
+  row.querySelector('.preview-link').classList.add('d-none');
+  row.querySelector('.doc-attached-indicator').style.display = 'none';
 }
 
 function calcRow(row){
@@ -1153,14 +1279,20 @@ function saveHistoryEntry(){
   const gText = document.getElementById('globalTotalSummary').textContent || '0';
   const g = parseFloat(gText.replace(/[^\d.-]/g,'')) || 0;
   const final = g * coeff;
-  
+  const docLinks = [];
+  document.querySelectorAll('#calcTable tbody tr').forEach(r=>{
+    if(r.dataset.docName){
+      docLinks.push({name:r.dataset.docName,url:r.dataset.docUrl||''});
+    }
+  });
   const hist = getHistory();
   hist.push({
     date: new Date().toLocaleString(),
     user: currentUser ? currentUser.email : 'invité',
     totalGeneral: Number(g).toFixed(2),
     coefficient: coeff,
-    finalTotal: Number(final).toFixed(2)
+    finalTotal: Number(final).toFixed(2),
+    documents: docLinks
   });
   
   saveHistory(hist);
@@ -1182,6 +1314,12 @@ function refreshHistoryUI(){
         const tr = document.createElement('tr');
         tr.innerHTML = `<td>${escapeHtml(h.date)}</td><td>${escapeHtml(h.user)}</td><td>${escapeHtml(h.totalGeneral)} ${settings.currency||DEFAULT_SETTINGS.currency}</td><td>${escapeHtml(String(h.coefficient))}</td><td>${escapeHtml(h.finalTotal)} ${settings.currency||DEFAULT_SETTINGS.currency}</td>`;
         tbody.appendChild(tr);
+        
+        if(h.documents && h.documents.length>0){
+          const docTr = document.createElement('tr');
+          docTr.innerHTML = `<td colspan="5"><small>Docs: ${h.documents.map(d=>`<a href="${d.url}" download="${d.name}" class="btn btn-link btn-sm">📥 ${d.name}</a>`).join(' | ')}</small></td>`;
+          tbody.appendChild(docTr);
+        }
       });
     }
   }
@@ -1290,11 +1428,12 @@ function exportPDF(){
     const pTTC = r.querySelector('.price-ttc')?.value || '0.00';
     const qty = r.querySelector('.quantity')?.value || '0';
     const total = r.querySelector('.total')?.value || '0.00';
-    rows.push([desc, supplier, unit, pHT, pTTC, qty, total]);
+    const docName = r.dataset.docName || '';
+    rows.push([desc, supplier, unit, pHT, pTTC, qty, total, docName]);
   });
   
   doc.autoTable({
-    head: [['Description','Fournisseur','Unité','Prix HT','Prix TTC','Quantité','Total']],
+    head: [['Description','Fournisseur','Unité','Prix HT','Prix TTC','Quantité','Total','Document']],
     body: rows,
     startY: 110,
     styles: { fontSize: 9 }
@@ -1312,7 +1451,7 @@ function exportPDF(){
 
 function exportExcel(){
   const data = [];
-  const headers = ['Description','Fournisseur','Unité','Prix HT','Prix TTC','Quantité','Total'];
+  const headers = ['Description','Fournisseur','Unité','Prix HT','Prix TTC','Quantité','Total','Document'];
   data.push(headers);
   
   document.querySelectorAll('#calcTable tbody tr').forEach(r => {
@@ -1323,15 +1462,16 @@ function exportExcel(){
       Number(r.querySelector('.price-ht')?.value || 0),
       Number(r.querySelector('.price-ttc')?.value || 0),
       Number(r.querySelector('.quantity')?.value || 0),
-      Number(r.querySelector('.total')?.value || 0)
+      Number(r.querySelector('.total')?.value || 0),
+      r.dataset.docName || ''
     ]);
   });
   
   data.push([]);
-  data.push(['Total HT','','','','','',document.getElementById('sumHT').textContent]);
-  data.push(['TVA','','','','','',document.getElementById('sumTVA').textContent]);
-  data.push(['Total TTC','','','','','',document.getElementById('sumTTC').textContent]);
-  data.push(['Prix final','','','','','',document.getElementById('finalPrice').textContent]);
+  data.push(['Total HT','','','','','','',document.getElementById('sumHT').textContent]);
+  data.push(['TVA','','','','','','',document.getElementById('sumTVA').textContent]);
+  data.push(['Total TTC','','','','','','',document.getElementById('sumTTC').textContent]);
+  data.push(['Prix final','','','','','','',document.getElementById('finalPrice').textContent]);
   
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(data);
@@ -1355,7 +1495,8 @@ function sendMail(){
     const pTTC = r.querySelector('.price-ttc')?.value || '';
     const qty = r.querySelector('.quantity')?.value || '';
     const total = r.querySelector('.total')?.value || '';
-    body += `${desc} | ${supplier} | ${unit} | HT:${pHT} | TTC:${pTTC} | q:${qty} | total:${total}\n`;
+    const docName = r.dataset.docName ? `[Document: ${r.dataset.docName}]` : '';
+    body += `${desc} | ${supplier} | ${unit} | HT:${pHT} | TTC:${pTTC} | q:${qty} | total:${total} ${docName}\n`;
   });
   
   window.location.href = `mailto:?subject=${encodeURIComponent('Calcul de revient')}&body=${encodeURIComponent(body)}`;
