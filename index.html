@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>CalculRevientTN - Application Fusionnée</title>
+<title>CalculRevientTN - Application Collaborative</title>
 
 <!-- CSS / libs -->
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -233,6 +233,73 @@ body {
   transform: scale(1.1);
 }
 
+/* Nouvelles classes pour les fonctionnalités collaboratives */
+.online-indicator {
+  width: 8px;
+  height: 8px;
+  background: #27ae60;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 5px;
+  animation: pulse 2s infinite;
+}
+
+.offline-indicator {
+  width: 8px;
+  height: 8px;
+  background: #e74c3c;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 5px;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+.sync-status {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--card-bg);
+  padding: 8px 16px;
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  z-index: 1000;
+  font-size: 0.85rem;
+}
+
+.team-member {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(52, 152, 219, 0.1);
+  border-radius: 8px;
+  margin-bottom: 5px;
+}
+
+.project-card {
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.project-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+}
+
+.project-card.active {
+  border-color: var(--accent);
+  background: rgba(52, 152, 219, 0.05);
+}
+
 @media (max-width: 768px) {
   .auth-card { 
     margin: 16px auto; 
@@ -357,6 +424,18 @@ body {
   font-size: 0.8rem;
   padding: 5px;
 }
+
+.backup-indicator {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: var(--card-bg);
+  padding: 8px 12px;
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  font-size: 0.8rem;
+  z-index: 1000;
+}
 </style>
 </head>
 <body>
@@ -364,6 +443,18 @@ body {
 <!-- Loading indicator -->
 <div class="loading" id="loadingIndicator" style="display: none;">
   <div class="spinner"></div>
+</div>
+
+<!-- Sync status indicator -->
+<div class="sync-status" id="syncStatus" style="display: none;">
+  <span class="online-indicator"></span>
+  <span id="syncText">Synchronisé</span>
+</div>
+
+<!-- Backup indicator -->
+<div class="backup-indicator" id="backupIndicator" style="display: none;">
+  <i class="fas fa-cloud-upload-alt me-1"></i>
+  <span id="backupText">Sauvegarde automatique...</span>
 </div>
 
 <!-- Toast notifications container -->
@@ -374,10 +465,10 @@ body {
   <div class="auth-container">
     <div class="auth-card" id="loginCard">
       <div class="auth-header">
-        <img src="logo.png" alt="Logo" class="company-logo" id="loginLogo">
+        <img src="https://via.placeholder.com/56x56/3498db/ffffff?text=CR" alt="Logo" class="company-logo" id="loginLogo">
         <div>
-          <div style="font-size:1.35rem;font-weight:700;" id="loginCompanyName">Société Exemple SARL</div>
-          <div style="font-size:0.95rem;opacity:.9;" id="loginCompanyAddress">12 Rue de Tunis, 1000 Tunis</div>
+          <div style="font-size:1.35rem;font-weight:700;" id="loginCompanyName">CalculRevient TN</div>
+          <div style="font-size:0.95rem;opacity:.9;" id="loginCompanyAddress">Application Collaborative</div>
         </div>
         <img src="https://upload.wikimedia.org/wikipedia/commons/c/ce/Flag_of_Tunisia.svg" class="flag" alt="Tunisie">
       </div>
@@ -408,10 +499,10 @@ body {
     
     <div class="auth-card" id="registerCard" style="display:none;">
       <div class="auth-header">
-        <img src="logo.png" alt="Logo" class="company-logo" id="registerLogo">
+        <img src="https://via.placeholder.com/56x56/3498db/ffffff?text=CR" alt="Logo" class="company-logo" id="registerLogo">
         <div>
-          <div style="font-size:1.35rem;font-weight:700;" id="registerCompanyName">Société Exemple SARL</div>
-          <div style="font-size:0.95rem;opacity:.9;" id="registerCompanyAddress">12 Rue de Tunis, 1000 Tunis</div>
+          <div style="font-size:1.35rem;font-weight:700;" id="registerCompanyName">CalculRevient TN</div>
+          <div style="font-size:0.95rem;opacity:.9;" id="registerCompanyAddress">Application Collaborative</div>
         </div>
         <img src="https://upload.wikimedia.org/wikipedia/commons/c/ce/Flag_of_Tunisia.svg" class="flag" alt="Tunisie">
       </div>
@@ -419,7 +510,7 @@ body {
         <h4 class="mb-4 text-center"><i class="fas fa-user-plus me-2"></i> Créer un compte</h4>
         <form id="registerForm">
           <div class="mb-3">
-            <label>Nom</label>
+            <label>Nom complet</label>
             <input id="regName" class="form-control" required>
             <div class="invalid-feedback">Veuillez saisir votre nom</div>
           </div>
@@ -432,6 +523,16 @@ body {
             <label>Mot de passe</label>
             <input id="regPassword" type="password" class="form-control" required minlength="6">
             <div class="invalid-feedback">Le mot de passe doit contenir au moins 6 caractères</div>
+          </div>
+          <div class="mb-3">
+            <label>Rôle dans l'équipe</label>
+            <select id="regRole" class="form-control" required>
+              <option value="">Sélectionner un rôle</option>
+              <option value="manager">Manager</option>
+              <option value="analyst">Analyste</option>
+              <option value="contributor">Contributeur</option>
+            </select>
+            <div class="invalid-feedback">Veuillez sélectionner un rôle</div>
           </div>
           <div class="d-flex justify-content-between">
             <button id="cancelRegister" class="btn btn-outline-secondary">Annuler</button>
@@ -451,10 +552,10 @@ body {
   <!-- Header -->
   <div class="app-header">
     <div class="d-flex align-items-center gap-3">
-      <img id="companyLogo" src="logo.png" class="company-logo" alt="Logo">
+      <img id="companyLogo" src="https://via.placeholder.com/56x56/3498db/ffffff?text=CR" class="company-logo" alt="Logo">
       <div>
-        <div id="companyName" style="font-weight:700;font-size:1.2rem;">Société Exemple SARL</div>
-        <div id="companyAddress" style="font-size:0.95rem;opacity:.9">12 Rue de Tunis, 1000 Tunis</div>
+        <div id="companyName" style="font-weight:700;font-size:1.2rem;">CalculRevient TN</div>
+        <div id="companyAddress" style="font-size:0.95rem;opacity:.9">Application Collaborative</div>
       </div>
     </div>
     <div class="text-end">
@@ -463,19 +564,65 @@ body {
     </div>
   </div>
 
+  <!-- PROJECT SELECTION PAGE -->
+  <div id="projectPage" style="display:none;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h3><i class="fas fa-folder-open me-2"></i> Mes Projets</h3>
+      <div>
+        <button id="createProjectBtn" class="btn btn-success me-2"><i class="fas fa-plus"></i> Nouveau Projet</button>
+        <button id="teamManagementBtn" class="btn btn-outline-primary me-2"><i class="fas fa-users"></i> Équipe</button>
+        <button id="projectLogout" class="btn btn-danger">Déconnexion</button>
+      </div>
+    </div>
+    
+    <div class="row">
+      <div class="col-md-8">
+        <div class="panel">
+          <h5 class="mb-3">Projets récents</h5>
+          <div id="projectsList">
+            <!-- Projects will be loaded here -->
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="panel">
+          <h6 class="mb-3">Équipe en ligne</h6>
+          <div id="teamMembersList">
+            <!-- Team members will be loaded here -->
+          </div>
+        </div>
+        <div class="panel">
+          <h6 class="mb-3">Statistiques</h6>
+          <div class="d-flex justify-content-between mb-2">
+            <span>Projets actifs:</span>
+            <span id="activeProjectsCount">0</span>
+          </div>
+          <div class="d-flex justify-content-between mb-2">
+            <span>Calculs ce mois:</span>
+            <span id="monthlyCalculationsCount">0</span>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span>Membres équipe:</span>
+            <span id="teamMembersCount">0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ADMIN PAGE -->
   <div id="adminPage" style="display:none;">
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h3><i class="fas fa-user-shield me-2"></i> Panneau Admin</h3>
       <div>
-        <button id="gotoAppBtn" class="btn btn-outline-primary me-2">Aller à l'application</button>
+        <button id="gotoProjectsBtn" class="btn btn-outline-primary me-2">Mes Projets</button>
         <button id="adminLogout" class="btn btn-danger">Déconnexion</button>
       </div>
     </div>
     <div class="row">
       <div class="col-md-6">
         <div class="panel">
-          <h5 class="mb-3">Paramètres modifiables</h5>
+          <h5 class="mb-3">Paramètres de l'entreprise</h5>
           <div class="mb-3">
             <label>Nom société</label>
             <input id="settingsCompanyName" class="form-control">
@@ -485,8 +632,8 @@ body {
             <input id="settingsAddress" class="form-control">
           </div>
           <div class="mb-3">
-            <label>Logo (URL ou fichier local)</label>
-            <input id="settingsLogoUrl" class="form-control" placeholder="logo.png ou https://...">
+            <label>Logo (URL)</label>
+            <input id="settingsLogoUrl" class="form-control" placeholder="https://...">
           </div>
           <div class="mb-3">
             <label>TVA (%)</label>
@@ -504,14 +651,23 @@ body {
       </div>
       <div class="col-md-6">
         <div class="panel">
-          <h5 class="mb-3">Utilisateurs enregistrés</h5>
+          <h5 class="mb-3">Gestion de l'équipe</h5>
           <div class="table-responsive">
             <table class="table table-sm" id="usersTable">
-              <thead><tr><th>Nom</th><th>Email</th><th>Action</th></tr></thead>
+              <thead><tr><th>Nom</th><th>Email</th><th>Rôle</th><th>Action</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
-          <small class="text-muted">Supprime un utilisateur si nécessaire.</small>
+        </div>
+        <div class="panel">
+          <h5 class="mb-3">Sauvegarde & Export</h5>
+          <button id="exportAllDataBtn" class="btn btn-outline-primary w-100 mb-2">
+            <i class="fas fa-download"></i> Exporter toutes les données
+          </button>
+          <button id="importDataBtn" class="btn btn-outline-success w-100">
+            <i class="fas fa-upload"></i> Importer des données
+          </button>
+          <input type="file" id="importFileInput" accept=".json" style="display: none;">
         </div>
       </div>
     </div>
@@ -520,10 +676,19 @@ body {
   <!-- APP PAGE -->
   <div id="appPage" style="display:none;">
     <div class="d-flex justify-content-between align-items-center mb-4">
-      <h3><i class="fas fa-calculator me-2"></i> Application de calcul</h3>
+      <div>
+        <h3><i class="fas fa-calculator me-2"></i> <span id="currentProjectName">Nouveau Calcul</span></h3>
+        <small class="text-muted" id="projectInfo">Projet collaboratif</small>
+      </div>
       <div>
         <span id="currentUserLabel" class="me-3 small text-muted"></span>
-        <button id="openAdmin" class="btn btn-outline-secondary me-2" title="Accès admin (admin seulement)"><i class="fas fa-user-cog"></i></button>
+        <button id="shareProjectBtn" class="btn btn-outline-success me-2" title="Partager le projet">
+          <i class="fas fa-share-alt"></i>
+        </button>
+        <button id="backToProjectsBtn" class="btn btn-outline-primary me-2">Projets</button>
+        <button id="openAdmin" class="btn btn-outline-secondary me-2" title="Accès admin">
+          <i class="fas fa-user-cog"></i>
+        </button>
         <button id="appLogout" class="btn btn-danger">Déconnexion</button>
       </div>
     </div>
@@ -532,6 +697,7 @@ body {
     <ul class="nav nav-tabs" id="mainTabs">
       <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabCalc">Calcul</a></li>
       <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabHistory">Historique</a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabTeam">Équipe</a></li>
     </ul>
 
     <div class="tab-content mt-4">
@@ -545,6 +711,7 @@ body {
                 <div>
                   <button id="addRow" class="btn btn-primary btn-sm me-2"><i class="fas fa-plus"></i> Ajouter</button>
                   <button id="btnCalculate" class="btn btn-success btn-sm"><i class="fas fa-calculator"></i> Calculer</button>
+                  <button id="saveProjectBtn" class="btn btn-outline-primary btn-sm ms-2"><i class="fas fa-save"></i> Sauvegarder</button>
                 </div>
               </div>
               <div id="docCounter" class="ms-2">Documents attachés : <span class="badge bg-secondary">0</span></div>
@@ -620,18 +787,19 @@ body {
           </div>
         </div>
       </div>
+      
       <!-- History Tab -->
       <div id="tabHistory" class="tab-pane fade">
         <div class="panel">
           <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5><i class="fas fa-history me-2"></i> Historique</h5>
+            <h5><i class="fas fa-history me-2"></i> Historique du projet</h5>
             <div>
-              <button id="clearHistory" class="btn btn-outline-danger btn-sm">Effacer historique</button>
+              <button id="clearProjectHistory" class="btn btn-outline-danger btn-sm">Effacer historique</button>
             </div>
           </div>
           <div class="table-responsive mb-4">
             <table class="table table-sm table-bordered" id="historyTable">
-              <thead><tr><th>Date</th><th>Utilisateur</th><th>Total général</th><th>Coeff</th><th>Prix final</th></tr></thead>
+              <thead><tr><th>Date</th><th>Utilisateur</th><th>Total général</th><th>Coeff</th><th>Prix final</th><th>Action</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -643,6 +811,96 @@ body {
               <canvas id="chartPie"></canvas>
             </div>
           </div>
+        </div>
+      </div>
+      
+      <!-- Team Tab -->
+      <div id="tabTeam" class="tab-pane fade">
+        <div class="panel">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5><i class="fas fa-users me-2"></i> Équipe du projet</h5>
+            <button id="inviteTeamMemberBtn" class="btn btn-success btn-sm">
+              <i class="fas fa-user-plus"></i> Inviter
+            </button>
+          </div>
+          <div id="projectTeamList">
+            <!-- Team members will be loaded here -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Create Project Modal -->
+<div class="modal fade" id="createProjectModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="createProjectForm">
+        <div class="modal-header">
+          <h5 class="modal-title">Créer un nouveau projet</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label>Nom du projet</label>
+            <input id="projectName" class="form-control" required placeholder="Ex: Calcul Projet Alpha">
+          </div>
+          <div class="mb-3">
+            <label>Description</label>
+            <textarea id="projectDescription" class="form-control" rows="3" placeholder="Description du projet..."></textarea>
+          </div>
+          <div class="mb-3">
+            <label>Type de projet</label>
+            <select id="projectType" class="form-control" required>
+              <option value="">Sélectionner</option>
+              <option value="construction">Construction</option>
+              <option value="renovation">Rénovation</option>
+              <option value="manufacturing">Production</option>
+              <option value="service">Service</option>
+              <option value="other">Autre</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+          <button type="submit" class="btn btn-primary">Créer le projet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Share Project Modal -->
+<div class="modal fade" id="shareProjectModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Partager le projet</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label>Lien de partage</label>
+          <div class="input-group">
+            <input id="shareLink" class="form-control" readonly>
+            <button class="btn btn-outline-secondary" type="button" id="copyShareLink">
+              <i class="fas fa-copy"></i>
+            </button>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label>Inviter par email</label>
+          <div class="input-group">
+            <input id="inviteEmail" type="email" class="form-control" placeholder="email@exemple.com">
+            <button class="btn btn-primary" type="button" id="sendInviteBtn">
+              <i class="fas fa-paper-plane"></i> Inviter
+            </button>
+          </div>
+        </div>
+        <div class="alert alert-info">
+          <i class="fas fa-info-circle me-2"></i>
+          Les personnes invitées pourront consulter et modifier ce projet en temps réel.
         </div>
       </div>
     </div>
@@ -658,7 +916,7 @@ body {
         <div class="modal-body">
           <div class="mb-3"><label>Email</label><input id="forgotEmail" type="email" class="form-control" required></div>
           <div class="mb-3"><label>Nouveau mot de passe</label><input id="forgotNewPass" type="password" class="form-control" required minlength="6"></div>
-          <small class="text-muted">Si l'email existe (non-admin), le mot de passe sera mis à jour.</small>
+          <small class="text-muted">Si l'email existe, le mot de passe sera mis à jour.</small>
         </div>
         <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button><button type="submit" class="btn btn-primary">Réinitialiser</button></div>
       </form>
@@ -692,20 +950,23 @@ body {
 // --------- Config / Storage keys ---------
 const ADMIN_EMAIL = 'omri.sami@ymail.com';
 const ADMIN_PASS = '21111989Ss**';
-const KEY_USERS = 'cr_users_fusion';
-const KEY_SETTINGS = 'cr_settings_fusion';
-const KEY_HISTORY = 'cr_history_fusion';
+const KEY_USERS = 'cr_users_collaborative';
+const KEY_SETTINGS = 'cr_settings_collaborative';
+const KEY_PROJECTS = 'cr_projects_collaborative';
+const KEY_CURRENT_PROJECT = 'cr_current_project';
 
 const DEFAULT_SETTINGS = {
-  companyName: 'Hensol Tunisia',
-  address: 'Ben Arous TN',
-  logoUrl: 'logo.png',
+  companyName: 'CalculRevient TN',
+  address: 'Tunisie',
+  logoUrl: 'https://via.placeholder.com/56x56/3498db/ffffff?text=CR',
   tva: 19,
   currency: 'TND'
 };
 
 let settings = {...DEFAULT_SETTINGS};
-let currentUser = null; // {name,email,isAdmin}
+let currentUser = null;
+let currentProject = null;
+let autoSaveInterval = null;
 
 // --------- Helpers storage ---------
 function loadSettings(){
@@ -715,14 +976,6 @@ function loadSettings(){
     else settings = {...DEFAULT_SETTINGS};
   }catch(e){ settings = {...DEFAULT_SETTINGS}; }
   applySettingsToUI();
-
-  // Synchronisation page de connexion & inscription
-  document.getElementById('loginCompanyName').textContent = settings.companyName || '';
-  document.getElementById('loginCompanyAddress').textContent = settings.address || '';
-  document.getElementById('loginLogo').src = settings.logoUrl || 'logo.png';
-  document.getElementById('registerCompanyName').textContent = settings.companyName || '';
-  document.getElementById('registerCompanyAddress').textContent = settings.address || '';
-  document.getElementById('registerLogo').src = settings.logoUrl || 'logo.png';
 }
 
 function saveSettings(){ 
@@ -743,16 +996,32 @@ function saveUsers(u){
   localStorage.setItem(KEY_USERS, JSON.stringify(u)); 
 }
 
-function getHistory(){ 
-  try{ 
-    return JSON.parse(localStorage.getItem(KEY_HISTORY) || '[]'); 
-  }catch(e){ 
-    return []; 
-  } 
+function getProjects(){
+  try{
+    return JSON.parse(localStorage.getItem(KEY_PROJECTS) || '[]');
+  }catch(e){
+    return [];
+  }
 }
 
-function saveHistory(h){ 
-  localStorage.setItem(KEY_HISTORY, JSON.stringify(h)); 
+function saveProjects(projects){
+  localStorage.setItem(KEY_PROJECTS, JSON.stringify(projects));
+}
+
+function getCurrentProject(){
+  try{
+    const projectId = localStorage.getItem(KEY_CURRENT_PROJECT);
+    if(!projectId) return null;
+    const projects = getProjects();
+    return projects.find(p => p.id === projectId) || null;
+  }catch(e){
+    return null;
+  }
+}
+
+function setCurrentProject(projectId){
+  localStorage.setItem(KEY_CURRENT_PROJECT, projectId);
+  currentProject = getCurrentProject();
 }
 
 // --------- UI shortcuts ---------
@@ -760,6 +1029,7 @@ const loginCard = document.getElementById('loginCard');
 const registerCard = document.getElementById('registerCard');
 const authView = document.getElementById('authView');
 const mainApp = document.getElementById('mainApp');
+const projectPage = document.getElementById('projectPage');
 const adminPage = document.getElementById('adminPage');
 const appPage = document.getElementById('appPage');
 
@@ -782,7 +1052,6 @@ function showToast(message, type = 'info') {
   const bsToast = new bootstrap.Toast(toast, { delay: 3000 });
   bsToast.show();
   
-  // Remove toast from DOM after it's hidden
   toast.addEventListener('hidden.bs.toast', () => {
     toast.remove();
   });
@@ -797,15 +1066,53 @@ function validateEmail(email) {
   return re.test(email);
 }
 
+function generateId() {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+function showSyncStatus(text, isOnline = true) {
+  const syncStatus = document.getElementById('syncStatus');
+  const syncText = document.getElementById('syncText');
+  syncText.textContent = text;
+  syncStatus.style.display = 'block';
+  
+  setTimeout(() => {
+    syncStatus.style.display = 'none';
+  }, 2000);
+}
+
+function showBackupIndicator(show = true) {
+  document.getElementById('backupIndicator').style.display = show ? 'block' : 'none';
+}
+
+// --------- Auto-save functionality ---------
+function startAutoSave() {
+  if (autoSaveInterval) clearInterval(autoSaveInterval);
+  
+  autoSaveInterval = setInterval(() => {
+    if (currentProject) {
+      saveCurrentProjectData();
+      showBackupIndicator(true);
+      setTimeout(() => showBackupIndicator(false), 1000);
+    }
+  }, 30000); // Auto-save every 30 seconds
+}
+
+function stopAutoSave() {
+  if (autoSaveInterval) {
+    clearInterval(autoSaveInterval);
+    autoSaveInterval = null;
+  }
+}
+
 // --------- Init on DOM ready ---------
 document.addEventListener('DOMContentLoaded', () => {
   loadSettings();
   bindAuth();
   bindAdmin();
   bindApp();
+  bindProjects();
   refreshUsersTable();
-  refreshHistoryUI();
-  updateSummaryDisplay();
   updateDocCounter();
 });
 
@@ -828,6 +1135,7 @@ function bindAuth(){
     const name = document.getElementById('regName').value.trim();
     const email = document.getElementById('regEmail').value.trim().toLowerCase();
     const pass = document.getElementById('regPassword').value;
+    const role = document.getElementById('regRole').value;
     
     // Validation
     let isValid = true;
@@ -850,6 +1158,13 @@ function bindAuth(){
       isValid = false;
     } else {
       document.getElementById('regPassword').classList.remove('is-invalid');
+    }
+    
+    if(!role) {
+      document.getElementById('regRole').classList.add('is-invalid');
+      isValid = false;
+    } else {
+      document.getElementById('regRole').classList.remove('is-invalid');
     }
     
     if(!isValid) {
@@ -877,7 +1192,15 @@ function bindAuth(){
     // Simulate async operation
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    users.push({name, email, password: pass});
+    users.push({
+      id: generateId(),
+      name, 
+      email, 
+      password: pass, 
+      role,
+      joinedAt: new Date().toISOString(),
+      lastActive: new Date().toISOString()
+    });
     saveUsers(users);
     
     // Hide loading
@@ -927,7 +1250,7 @@ function bindAuth(){
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     if(email === ADMIN_EMAIL && pass === ADMIN_PASS){
-      currentUser = {name: 'Admin', email: ADMIN_EMAIL, isAdmin: true};
+      currentUser = {id: 'admin', name: 'Admin', email: ADMIN_EMAIL, isAdmin: true, role: 'admin'};
       
       // Hide loading
       spinner.style.display = 'none';
@@ -949,13 +1272,17 @@ function bindAuth(){
       return; 
     }
     
-    currentUser = {name: u.name, email: u.email, isAdmin: false};
+    // Update last active
+    u.lastActive = new Date().toISOString();
+    saveUsers(users);
+    
+    currentUser = {id: u.id, name: u.name, email: u.email, isAdmin: false, role: u.role};
     
     // Hide loading
     spinner.style.display = 'none';
     loginBtn.disabled = false;
       
-    enterApp();
+    enterProjects();
   });
   
   const forgotModalEl = document.getElementById('forgotModal');
@@ -996,13 +1323,21 @@ function bindAuth(){
   });
 }
 
-// ---------------- ENTER ADMIN / APP ----------------
+// ---------------- ENTER PAGES ----------------
 function applySettingsToUI(){
-  document.getElementById('companyLogo').src = settings.logoUrl || 'logo.png';
+  document.getElementById('companyLogo').src = settings.logoUrl || DEFAULT_SETTINGS.logoUrl;
   document.getElementById('companyName').textContent = settings.companyName || '';
   document.getElementById('companyAddress').textContent = settings.address || '';
   document.getElementById('showTVA').textContent = settings.tva;
   document.getElementById('showTVA2').textContent = settings.tva;
+  
+  // Update auth cards
+  document.getElementById('loginCompanyName').textContent = settings.companyName || '';
+  document.getElementById('loginCompanyAddress').textContent = settings.address || '';
+  document.getElementById('loginLogo').src = settings.logoUrl || DEFAULT_SETTINGS.logoUrl;
+  document.getElementById('registerCompanyName').textContent = settings.companyName || '';
+  document.getElementById('registerCompanyAddress').textContent = settings.address || '';
+  document.getElementById('registerLogo').src = settings.logoUrl || DEFAULT_SETTINGS.logoUrl;
   
   if(document.getElementById('settingsCompanyName')) document.getElementById('settingsCompanyName').value = settings.companyName;
   if(document.getElementById('settingsAddress')) document.getElementById('settingsAddress').value = settings.address;
@@ -1017,20 +1352,212 @@ function enterAdmin(){
   authView.style.display='none';
   mainApp.style.display='';
   adminPage.style.display='';
+  projectPage.style.display='none';
   appPage.style.display='none';
-  document.getElementById('currentUserLabel').textContent = 'Admin';
   refreshUsersTable();
-  updateHistoryControls();
+}
+
+function enterProjects(){
+  authView.style.display='none';
+  mainApp.style.display='';
+  adminPage.style.display='none';
+  projectPage.style.display='';
+  appPage.style.display='none';
+  document.getElementById('currentUserLabel').textContent = currentUser ? `${currentUser.name} (${currentUser.email})` : '';
+  refreshProjectsList();
+  refreshTeamStats();
 }
 
 function enterApp(){
   authView.style.display='none';
   mainApp.style.display='';
   adminPage.style.display='none';
+  projectPage.style.display='none';
   appPage.style.display='';
   document.getElementById('currentUserLabel').textContent = currentUser ? `${currentUser.name} (${currentUser.email})` : '';
-  refreshHistoryUI();
-  updateHistoryControls();
+  
+  if(currentProject) {
+    document.getElementById('currentProjectName').textContent = currentProject.name;
+    document.getElementById('projectInfo').textContent = `Créé le ${new Date(currentProject.createdAt).toLocaleDateString()}`;
+    loadProjectData();
+  }
+  
+  refreshProjectHistory();
+  refreshProjectTeam();
+  startAutoSave();
+}
+
+// ---------------- PROJECTS MANAGEMENT ----------------
+function bindProjects(){
+  const createProjectModal = new bootstrap.Modal(document.getElementById('createProjectModal'));
+  const shareProjectModal = new bootstrap.Modal(document.getElementById('shareProjectModal'));
+  
+  document.getElementById('createProjectBtn').addEventListener('click', () => {
+    document.getElementById('createProjectForm').reset();
+    createProjectModal.show();
+  });
+  
+  document.getElementById('createProjectForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = document.getElementById('projectName').value.trim();
+    const description = document.getElementById('projectDescription').value.trim();
+    const type = document.getElementById('projectType').value;
+    
+    if(!name || !type) {
+      showToast('Veuillez remplir tous les champs requis', 'error');
+      return;
+    }
+    
+    const projects = getProjects();
+    const newProject = {
+      id: generateId(),
+      name,
+      description,
+      type,
+      createdBy: currentUser.id,
+      createdAt: new Date().toISOString(),
+      lastModified: new Date().toISOString(),
+      team: [currentUser.id],
+      calculations: [],
+      history: []
+    };
+    
+    projects.push(newProject);
+    saveProjects(projects);
+    
+    showToast('Projet créé avec succès', 'success');
+    createProjectModal.hide();
+    refreshProjectsList();
+  });
+  
+  document.getElementById('shareProjectBtn').addEventListener('click', () => {
+    if(!currentProject) return;
+    
+    const shareLink = `${window.location.origin}${window.location.pathname}?project=${currentProject.id}`;
+    document.getElementById('shareLink').value = shareLink;
+    shareProjectModal.show();
+  });
+  
+  document.getElementById('copyShareLink').addEventListener('click', () => {
+    const shareLink = document.getElementById('shareLink');
+    shareLink.select();
+    document.execCommand('copy');
+    showToast('Lien copié dans le presse-papier', 'success');
+  });
+  
+  document.getElementById('sendInviteBtn').addEventListener('click', () => {
+    const email = document.getElementById('inviteEmail').value.trim();
+    if(!validateEmail(email)) {
+      showToast('Veuillez saisir un email valide', 'error');
+      return;
+    }
+    
+    // In a real app, this would send an email invitation
+    const shareLink = document.getElementById('shareLink').value;
+    const subject = `Invitation à rejoindre le projet: ${currentProject.name}`;
+    const body = `Vous êtes invité(e) à rejoindre le projet "${currentProject.name}".\n\nCliquez sur ce lien pour accéder au projet:\n${shareLink}`;
+    
+    window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    showToast('Invitation envoyée par email', 'success');
+  });
+  
+  document.getElementById('backToProjectsBtn').addEventListener('click', () => {
+    stopAutoSave();
+    enterProjects();
+  });
+  
+  document.getElementById('projectLogout').addEventListener('click', () => {
+    showToast('Déconnexion réussie', 'success');
+    setTimeout(() => location.reload(), 1000);
+  });
+  
+  document.getElementById('gotoProjectsBtn').addEventListener('click', () => {
+    enterProjects();
+  });
+}
+
+function refreshProjectsList(){
+  const projectsList = document.getElementById('projectsList');
+  const projects = getProjects();
+  
+  if(projects.length === 0) {
+    projectsList.innerHTML = '<div class="text-center text-muted py-4">Aucun projet. Créez votre premier projet!</div>';
+    return;
+  }
+  
+  projectsList.innerHTML = projects.map(project => `
+    <div class="project-card" data-project-id="${project.id}">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <h6 class="mb-1">${escapeHtml(project.name)}</h6>
+        <span class="badge bg-primary">${escapeHtml(project.type)}</span>
+      </div>
+      <p class="text-muted small mb-2">${escapeHtml(project.description || 'Aucune description')}</p>
+      <div class="d-flex justify-content-between align-items-center">
+        <small class="text-muted">
+          <i class="fas fa-calendar me-1"></i>
+          ${new Date(project.createdAt).toLocaleDateString()}
+        </small>
+        <div>
+          <button class="btn btn-sm btn-outline-primary open-project" data-project-id="${project.id}">
+            <i class="fas fa-folder-open"></i> Ouvrir
+          </button>
+          <button class="btn btn-sm btn-outline-danger delete-project ms-1" data-project-id="${project.id}">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+  
+  // Bind events
+  document.querySelectorAll('.open-project').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const projectId = e.target.closest('button').dataset.projectId;
+      setCurrentProject(projectId);
+      enterApp();
+    });
+  });
+  
+  document.querySelectorAll('.delete-project').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const projectId = e.target.closest('button').dataset.projectId;
+      const project = getProjects().find(p => p.id === projectId);
+      
+      if(confirm(`Êtes-vous sûr de vouloir supprimer le projet "${project.name}" ?`)) {
+        const projects = getProjects().filter(p => p.id !== projectId);
+        saveProjects(projects);
+        refreshProjectsList();
+        showToast('Projet supprimé', 'success');
+      }
+    });
+  });
+}
+
+function refreshTeamStats(){
+  const projects = getProjects();
+  const users = getUsers();
+  
+  document.getElementById('activeProjectsCount').textContent = projects.length;
+  document.getElementById('teamMembersCount').textContent = users.length;
+  
+  // Calculate monthly calculations (mock data)
+  document.getElementById('monthlyCalculationsCount').textContent = projects.reduce((sum, p) => sum + (p.history?.length || 0), 0);
+  
+  // Show online team members
+  const teamMembersList = document.getElementById('teamMembersList');
+  if(users.length === 0) {
+    teamMembersList.innerHTML = '<div class="text-center text-muted py-3">Aucun membre d\'équipe</div>';
+  } else {
+    teamMembersList.innerHTML = users.map(user => `
+      <div class="team-member">
+        <div class="online-indicator"></div>
+        <div>
+          <div class="fw-bold">${escapeHtml(user.name)}</div>
+          <small class="text-muted">${escapeHtml(user.role)}</small>
+        </div>
+      </div>
+    `).join('');
+  }
 }
 
 // ---------------- ADMIN BIND ----------------
@@ -1055,11 +1582,59 @@ function bindAdmin(){
     setTimeout(() => location.reload(), 1000);
   });
   
-  document.getElementById('gotoAppBtn')?.addEventListener('click', ()=>{ 
-    adminPage.style.display='none'; 
-    appPage.style.display=''; 
-    updateHistoryControls(); 
+  document.getElementById('exportAllDataBtn').addEventListener('click', exportAllData);
+  document.getElementById('importDataBtn').addEventListener('click', () => {
+    document.getElementById('importFileInput').click();
   });
+  
+  document.getElementById('importFileInput').addEventListener('change', importData);
+}
+
+function exportAllData(){
+  const data = {
+    users: getUsers(),
+    projects: getProjects(),
+    settings: settings,
+    exportDate: new Date().toISOString()
+  };
+  
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `calculrevient-backup-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  
+  showToast('Données exportées avec succès', 'success');
+}
+
+function importData(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    try {
+      const data = JSON.parse(event.target.result);
+      
+      if(confirm('Cette action va remplacer toutes les données existantes. Continuer ?')) {
+        if(data.users) saveUsers(data.users);
+        if(data.projects) saveProjects(data.projects);
+        if(data.settings) {
+          settings = {...DEFAULT_SETTINGS, ...data.settings};
+          saveSettings();
+        }
+        
+        showToast('Données importées avec succès', 'success');
+        refreshUsersTable();
+        setTimeout(() => location.reload(), 2000);
+      }
+    } catch(error) {
+      showToast('Erreur lors de l\'importation du fichier', 'error');
+    }
+  };
+  reader.readAsText(file);
 }
 
 // ---------------- USERS TABLE (admin) ----------------
@@ -1070,13 +1645,16 @@ function refreshUsersTable(){
   const users = getUsers();
   
   if (users.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">Aucun utilisateur enregistré</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Aucun utilisateur enregistré</td></tr>';
     return;
   }
   
   users.forEach(u=>{
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${escapeHtml(u.name)}</td><td>${escapeHtml(u.email)}</td>
+    tr.innerHTML = `
+      <td>${escapeHtml(u.name)}</td>
+      <td>${escapeHtml(u.email)}</td>
+      <td><span class="badge bg-secondary">${escapeHtml(u.role)}</span></td>
       <td><button class="btn btn-sm btn-danger remove-user" data-email="${escapeHtml(u.email)}">Suppr</button></td>`;
     tbody.appendChild(tr);
   });
@@ -1105,7 +1683,6 @@ function bindApp(){
     attachRowEvents(tr);
     document.querySelector('#calcTable tbody').appendChild(tr);
     
-    // Remove animation class after animation completes
     setTimeout(() => {
       tr.classList.remove('new-row');
     }, 500);
@@ -1113,23 +1690,32 @@ function bindApp(){
   
   document.getElementById('btnCalculate').addEventListener('click', ()=>{
     document.querySelectorAll('#calcTable tbody tr').forEach(calcRow);
-    saveHistoryEntry();
-    refreshHistoryUI();
-    showToast('Calcul effectué et enregistré dans l’historique.', 'success');
+    saveCalculationToHistory();
+    refreshProjectHistory();
+    showToast('Calcul effectué et enregistré dans l\'historique.', 'success');
+    showSyncStatus('Calcul synchronisé');
+  });
+  
+  document.getElementById('saveProjectBtn').addEventListener('click', ()=>{
+    saveCurrentProjectData();
+    showToast('Projet sauvegardé', 'success');
+    showSyncStatus('Projet sauvegardé');
   });
   
   document.getElementById('coefficient').addEventListener('input', updateFinalPrice);
   
   document.getElementById('appLogout').addEventListener('click', ()=>{ 
+    stopAutoSave();
     showToast('Déconnexion réussie', 'success');
     setTimeout(() => location.reload(), 1000);
   });
   
   document.getElementById('openAdmin').addEventListener('click', ()=>{
     if(currentUser && currentUser.isAdmin) { 
+      stopAutoSave();
       enterAdmin(); 
     } else { 
-      showToast('Accès admin réservé. Connectez-vous en tant qu’admin.', 'error'); 
+      showToast('Accès admin réservé. Connectez-vous en tant qu\'admin.', 'error'); 
     }
   });
   
@@ -1137,18 +1723,165 @@ function bindApp(){
   document.getElementById('exportExcelBtn').addEventListener('click', exportExcel);
   document.getElementById('sendMailBtn').addEventListener('click', sendMail);
   
-  const clearBtn = document.getElementById('clearHistory');
+  const clearBtn = document.getElementById('clearProjectHistory');
   if(clearBtn){
     clearBtn.addEventListener('click', ()=>{
-      if(!currentUser || !currentUser.isAdmin){
-        showToast('Seul l\'admin peut effacer l\'historique.', 'error');
+      if(!currentUser || (!currentUser.isAdmin && currentProject.createdBy !== currentUser.id)){
+        showToast('Seul l\'admin ou le créateur du projet peut effacer l\'historique.', 'error');
         return;
       }
-      if(!confirm('Effacer tout l’historique ?')) return;
-      saveHistory([]);
-      refreshHistoryUI();
+      if(!confirm('Effacer tout l\'historique de ce projet ?')) return;
+      
+      if(currentProject) {
+        currentProject.history = [];
+        const projects = getProjects();
+        const idx = projects.findIndex(p => p.id === currentProject.id);
+        if(idx !== -1) {
+          projects[idx] = currentProject;
+          saveProjects(projects);
+        }
+      }
+      
+      refreshProjectHistory();
       showToast('Historique effacé', 'success');
     });
+  }
+}
+
+function saveCurrentProjectData(){
+  if(!currentProject) return;
+  
+  const calculations = [];
+  document.querySelectorAll('#calcTable tbody tr').forEach(row => {
+    const calc = {
+      description: row.querySelector('.description')?.value || '',
+      supplier: row.querySelector('.supplier')?.value || '',
+      unit: row.querySelector('.unit')?.value || '',
+      priceHT: parseFloat(row.querySelector('.price-ht')?.value) || 0,
+      priceTTC: parseFloat(row.querySelector('.price-ttc')?.value) || 0,
+      quantity: parseFloat(row.querySelector('.quantity')?.value) || 0,
+      total: parseFloat(row.querySelector('.total')?.value) || 0,
+      document: row.dataset.docName || ''
+    };
+    calculations.push(calc);
+  });
+  
+  currentProject.calculations = calculations;
+  currentProject.lastModified = new Date().toISOString();
+  currentProject.coefficient = parseFloat(document.getElementById('coefficient').value) || 1;
+  
+  const projects = getProjects();
+  const idx = projects.findIndex(p => p.id === currentProject.id);
+  if(idx !== -1) {
+    projects[idx] = currentProject;
+    saveProjects(projects);
+  }
+}
+
+function loadProjectData(){
+  if(!currentProject || !currentProject.calculations) return;
+  
+  const tbody = document.querySelector('#calcTable tbody');
+  tbody.innerHTML = '';
+  
+  if(currentProject.calculations.length === 0) {
+    // Add default empty row
+    const tr = document.createElement('tr');
+    tr.className = 'calc-row';
+    tr.innerHTML = `
+      <td><input class="form-control description" placeholder="Description"></td>
+      <td><input class="form-control supplier" placeholder="Fournisseur"></td>
+      <td>
+        <select class="form-control unit">
+          <option value="">Sélectionner</option>
+          <option>pièce</option><option>kg</option><option>m</option><option>m²</option><option>l</option>
+        </select>
+      </td>
+      <td><input type="number" class="form-control price-ht" step="0.01" min="0" placeholder="0.00"></td>
+      <td><input class="form-control price-ttc" readonly placeholder="0.00"></td>
+      <td><input type="number" class="form-control quantity" step="0.01" min="0" placeholder="0"></td>
+      <td><input class="form-control total" readonly placeholder="0.00"></td>
+      <td>
+        <input type="file" class="form-control form-control-sm doc-file" accept=".pdf,.jpg,.png,.jpeg">
+        <div class="preview-link d-none">
+          <span><i class="fas fa-check-circle doc-attached-indicator"></i><span class="file-name"></span></span>
+          <i class="fas fa-times remove-doc" title="Supprimer le document"></i>
+        </div>
+      </td>
+      <td><button class="btn btn-sm btn-danger remove-row"><i class="fas fa-trash"></i></button></td>
+    `;
+    attachRowEvents(tr);
+    tbody.appendChild(tr);
+  } else {
+    currentProject.calculations.forEach(calc => {
+      const tr = document.createElement('tr');
+      tr.className = 'calc-row';
+      tr.innerHTML = `
+        <td><input class="form-control description" placeholder="Description" value="${escapeHtml(calc.description)}"></td>
+        <td><input class="form-control supplier" placeholder="Fournisseur" value="${escapeHtml(calc.supplier)}"></td>
+        <td>
+          <select class="form-control unit">
+            <option value="">Sélectionner</option>
+            <option ${calc.unit === 'pièce' ? 'selected' : ''}>pièce</option>
+            <option ${calc.unit === 'kg' ? 'selected' : ''}>kg</option>
+            <option ${calc.unit === 'm' ? 'selected' : ''}>m</option>
+            <option ${calc.unit === 'm²' ? 'selected' : ''}>m²</option>
+            <option ${calc.unit === 'l' ? 'selected' : ''}>l</option>
+          </select>
+        </td>
+        <td><input type="number" class="form-control price-ht" step="0.01" min="0" placeholder="0.00" value="${calc.priceHT}"></td>
+        <td><input class="form-control price-ttc" readonly placeholder="0.00" value="${calc.priceTTC.toFixed(2)}"></td>
+        <td><input type="number" class="form-control quantity" step="0.01" min="0" placeholder="0" value="${calc.quantity}"></td>
+        <td><input class="form-control total" readonly placeholder="0.00" value="${calc.total.toFixed(2)}"></td>
+        <td>
+          <input type="file" class="form-control form-control-sm doc-file" accept=".pdf,.jpg,.png,.jpeg">
+          <div class="preview-link d-none">
+            <span><i class="fas fa-check-circle doc-attached-indicator"></i><span class="file-name"></span></span>
+            <i class="fas fa-times remove-doc" title="Supprimer le document"></i>
+          </div>
+        </td>
+        <td><button class="btn btn-sm btn-danger remove-row"><i class="fas fa-trash"></i></button></td>
+      `;
+      attachRowEvents(tr);
+      tbody.appendChild(tr);
+    });
+  }
+  
+  if(currentProject.coefficient) {
+    document.getElementById('coefficient').value = currentProject.coefficient;
+  }
+  
+  calcGlobal();
+  updateDocCounter();
+}
+
+function saveCalculationToHistory(){
+  if(!currentProject) return;
+  
+  const coeff = parseFloat(document.getElementById('coefficient').value) || 1;
+  const gText = document.getElementById('globalTotalSummary').textContent || '0';
+  const g = parseFloat(gText.replace(/[^\d.-]/g,'')) || 0;
+  const final = g * coeff;
+  
+  const historyEntry = {
+    id: generateId(),
+    date: new Date().toISOString(),
+    user: currentUser ? currentUser.email : 'invité',
+    userName: currentUser ? currentUser.name : 'Invité',
+    totalGeneral: Number(g).toFixed(2),
+    coefficient: coeff,
+    finalTotal: Number(final).toFixed(2),
+    calculations: currentProject.calculations || []
+  };
+  
+  if(!currentProject.history) currentProject.history = [];
+  currentProject.history.push(historyEntry);
+  
+  const projects = getProjects();
+  const idx = projects.findIndex(p => p.id === currentProject.id);
+  if(idx !== -1) {
+    projects[idx] = currentProject;
+    saveProjects(projects);
   }
 }
 
@@ -1274,58 +2007,56 @@ function updateFinalPrice(){
   document.getElementById('finalPrice').textContent = Number(final).toFixed(2) + ' ' + (settings.currency||DEFAULT_SETTINGS.currency);
 }
 
-function saveHistoryEntry(){
-  const coeff = parseFloat(document.getElementById('coefficient').value) || 1;
-  const gText = document.getElementById('globalTotalSummary').textContent || '0';
-  const g = parseFloat(gText.replace(/[^\d.-]/g,'')) || 0;
-  const final = g * coeff;
-  const docLinks = [];
-  document.querySelectorAll('#calcTable tbody tr').forEach(r=>{
-    if(r.dataset.docName){
-      docLinks.push({name:r.dataset.docName,url:r.dataset.docUrl||''});
-    }
-  });
-  const hist = getHistory();
-  hist.push({
-    date: new Date().toLocaleString(),
-    user: currentUser ? currentUser.email : 'invité',
-    totalGeneral: Number(g).toFixed(2),
-    coefficient: coeff,
-    finalTotal: Number(final).toFixed(2),
-    documents: docLinks
-  });
-  
-  saveHistory(hist);
-}
-
 let chartLine = null, chartPie = null;
 
-function refreshHistoryUI(){
-  const hist = getHistory() || [];
+function refreshProjectHistory(){
+  if(!currentProject) return;
+  
+  const hist = currentProject.history || [];
   const tbody = document.querySelector('#historyTable tbody');
   
   if(tbody){
     tbody.innerHTML = '';
     
     if (hist.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Aucun historique disponible</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Aucun historique disponible</td></tr>';
     } else {
       hist.slice().reverse().forEach(h=>{
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${escapeHtml(h.date)}</td><td>${escapeHtml(h.user)}</td><td>${escapeHtml(h.totalGeneral)} ${settings.currency||DEFAULT_SETTINGS.currency}</td><td>${escapeHtml(String(h.coefficient))}</td><td>${escapeHtml(h.finalTotal)} ${settings.currency||DEFAULT_SETTINGS.currency}</td>`;
+        tr.innerHTML = `
+          <td>${new Date(h.date).toLocaleString()}</td>
+          <td>${escapeHtml(h.userName || h.user)}</td>
+          <td>${escapeHtml(h.totalGeneral)} ${settings.currency||DEFAULT_SETTINGS.currency}</td>
+          <td>${escapeHtml(String(h.coefficient))}</td>
+          <td>${escapeHtml(h.finalTotal)} ${settings.currency||DEFAULT_SETTINGS.currency}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-primary restore-calculation" data-history-id="${h.id}">
+              <i class="fas fa-undo"></i> Restaurer
+            </button>
+          </td>
+        `;
         tbody.appendChild(tr);
-        
-        if(h.documents && h.documents.length>0){
-          const docTr = document.createElement('tr');
-          docTr.innerHTML = `<td colspan="5"><small>Docs: ${h.documents.map(d=>`<a href="${d.url}" download="${d.name}" class="btn btn-link btn-sm">📥 ${d.name}</a>`).join(' | ')}</small></td>`;
-          tbody.appendChild(docTr);
-        }
       });
     }
   }
   
+  // Bind restore events
+  document.querySelectorAll('.restore-calculation').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const historyId = e.target.closest('button').dataset.historyId;
+      const historyEntry = hist.find(h => h.id === historyId);
+      
+      if(historyEntry && confirm('Restaurer ce calcul ? Les données actuelles seront remplacées.')) {
+        currentProject.calculations = historyEntry.calculations || [];
+        currentProject.coefficient = historyEntry.coefficient || 1;
+        loadProjectData();
+        showToast('Calcul restauré', 'success');
+      }
+    });
+  });
+  
   try{
-    const dates = hist.map(h=>h.date);
+    const dates = hist.map(h=>new Date(h.date).toLocaleDateString());
     const finals = hist.map(h=>Number(h.finalTotal));
     const ctxLine = document.getElementById('chartLine');
     
@@ -1373,7 +2104,7 @@ function refreshHistoryUI(){
     }
     
     const byUser = {};
-    hist.forEach(h => { byUser[h.user] = (byUser[h.user]||0) + Number(h.finalTotal); });
+    hist.forEach(h => { byUser[h.userName || h.user] = (byUser[h.userName || h.user]||0) + Number(h.finalTotal); });
     const users = Object.keys(byUser);
     const values = users.map(u=>byUser[u]);
     const colors = users.map((_,i)=>`hsl(${(i*60)%360} 70% 55%)`);
@@ -1410,6 +2141,54 @@ function refreshHistoryUI(){
   }
 }
 
+function refreshProjectTeam(){
+  if(!currentProject) return;
+  
+  const teamList = document.getElementById('projectTeamList');
+  const users = getUsers();
+  const teamMembers = users.filter(u => currentProject.team && currentProject.team.includes(u.id));
+  
+  if(teamMembers.length === 0) {
+    teamList.innerHTML = '<div class="text-center text-muted py-3">Aucun membre dans ce projet</div>';
+    return;
+  }
+  
+  teamList.innerHTML = teamMembers.map(member => `
+    <div class="team-member">
+      <div class="online-indicator"></div>
+      <div class="flex-grow-1">
+        <div class="fw-bold">${escapeHtml(member.name)}</div>
+        <small class="text-muted">${escapeHtml(member.email)} • ${escapeHtml(member.role)}</small>
+      </div>
+      ${currentUser.isAdmin || currentProject.createdBy === currentUser.id ? `
+        <button class="btn btn-sm btn-outline-danger remove-team-member" data-user-id="${member.id}">
+          <i class="fas fa-user-minus"></i>
+        </button>
+      ` : ''}
+    </div>
+  `).join('');
+  
+  // Bind remove team member events
+  document.querySelectorAll('.remove-team-member').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const userId = e.target.closest('button').dataset.userId;
+      const user = users.find(u => u.id === userId);
+      
+      if(confirm(`Retirer ${user.name} de ce projet ?`)) {
+        currentProject.team = currentProject.team.filter(id => id !== userId);
+        const projects = getProjects();
+        const idx = projects.findIndex(p => p.id === currentProject.id);
+        if(idx !== -1) {
+          projects[idx] = currentProject;
+          saveProjects(projects);
+        }
+        refreshProjectTeam();
+        showToast('Membre retiré du projet', 'success');
+      }
+    });
+  });
+}
+
 function exportPDF(){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({unit:'pt',format:'a4'});
@@ -1417,7 +2196,8 @@ function exportPDF(){
   doc.setFontSize(12);
   doc.text(settings.companyName || DEFAULT_SETTINGS.companyName, 40, 50);
   doc.text(settings.address || DEFAULT_SETTINGS.address, 40, 66);
-  doc.text('Calcul de revient - ' + (new Date()).toLocaleString(), 40, 86);
+  doc.text(`Projet: ${currentProject ? currentProject.name : 'Nouveau Calcul'}`, 40, 82);
+  doc.text('Calcul de revient - ' + (new Date()).toLocaleString(), 40, 98);
   
   const rows = [];
   document.querySelectorAll('#calcTable tbody tr').forEach(r=>{
@@ -1435,17 +2215,18 @@ function exportPDF(){
   doc.autoTable({
     head: [['Description','Fournisseur','Unité','Prix HT','Prix TTC','Quantité','Total','Document']],
     body: rows,
-    startY: 110,
+    startY: 120,
     styles: { fontSize: 9 }
   });
   
-  const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 120;
+  const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 130;
   doc.text(`Total HT: ${document.getElementById('sumHT').textContent}`, 40, finalY);
   doc.text(`TVA: ${document.getElementById('sumTVA').textContent}`, 40, finalY + 16);
   doc.text(`Total TTC: ${document.getElementById('sumTTC').textContent}`, 40, finalY + 32);
   doc.text(`Prix final: ${document.getElementById('finalPrice').textContent}`, 40, finalY + 48);
   
-  doc.save('calcul_revient.pdf');
+  const fileName = currentProject ? `${currentProject.name.replace(/[^a-zA-Z0-9]/g, '_')}_calcul.pdf` : 'calcul_revient.pdf';
+  doc.save(fileName);
   showToast('PDF exporté avec succès', 'success');
 }
 
@@ -1476,12 +2257,18 @@ function exportExcel(){
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(data);
   XLSX.utils.book_append_sheet(wb, ws, 'CalculRevient');
-  XLSX.writeFile(wb, 'calcul-revient.xlsx');
+  
+  const fileName = currentProject ? `${currentProject.name.replace(/[^a-zA-Z0-9]/g, '_')}_calcul.xlsx` : 'calcul-revient.xlsx';
+  XLSX.writeFile(wb, fileName);
   showToast('Fichier Excel exporté avec succès', 'success');
 }
 
 function sendMail(){
-  let body = `Société: ${settings.companyName}\nAdresse: ${settings.address}\n\nRésumé:\n`;
+  let body = `Société: ${settings.companyName}\nAdresse: ${settings.address}\n`;
+  if(currentProject) {
+    body += `Projet: ${currentProject.name}\n`;
+  }
+  body += `\nRésumé:\n`;
   body += `Total HT: ${document.getElementById('sumHT').textContent}\n`;
   body += `TVA: ${document.getElementById('sumTVA').textContent}\n`;
   body += `Total TTC: ${document.getElementById('sumTTC').textContent}\n`;
@@ -1499,7 +2286,8 @@ function sendMail(){
     body += `${desc} | ${supplier} | ${unit} | HT:${pHT} | TTC:${pTTC} | q:${qty} | total:${total} ${docName}\n`;
   });
   
-  window.location.href = `mailto:?subject=${encodeURIComponent('Calcul de revient')}&body=${encodeURIComponent(body)}`;
+  const subject = currentProject ? `Calcul de revient - ${currentProject.name}` : 'Calcul de revient';
+  window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
 function updateSummaryDisplay(){
@@ -1511,18 +2299,16 @@ function updateSummaryDisplay(){
   });
 }
 
-function updateHistoryControls(){
-  const btn = document.getElementById('clearHistory');
-  if(!btn) return;
+// Check for shared project on page load
+window.addEventListener('load', () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const sharedProjectId = urlParams.get('project');
   
-  if(currentUser && currentUser.isAdmin){
-    btn.style.display = '';
-    btn.disabled = false;
-  } else {
-    btn.style.display = 'none';
-    btn.disabled = true;
+  if(sharedProjectId) {
+    // Auto-login for shared projects (in a real app, this would be handled differently)
+    showToast('Accès au projet partagé. Veuillez vous connecter.', 'info');
   }
-}
+});
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
